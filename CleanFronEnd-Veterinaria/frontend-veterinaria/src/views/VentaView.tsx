@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-    ShoppingCart, Plus, Search, Calendar, DollarSign, X, Trash2, FileText 
+    ShoppingCart, Plus, Search, Calendar, DollarSign, X, Trash2, FileText, Printer, ScanLine 
 } from 'lucide-react';
 import { VentaService, MedicamentoService } from '../services/apiService';
 import type { VentaResponse, Medicamento, DetalleVenta } from '../models';
@@ -12,11 +12,15 @@ export const VentaView = () => {
     const [mostrarModal, setMostrarModal] = useState(false);
     const [busqueda, setBusqueda] = useState('');
 
-    // Estado para Nueva Venta (Carrito)
+    // Estado para Nueva Venta
     const [carrito, setCarrito] = useState<DetalleVenta[]>([]);
     const [productoSeleccionado, setProductoSeleccionado] = useState('');
     const [cantidad, setCantidad] = useState(1);
     const [metodoPago, setMetodoPago] = useState('Efectivo');
+
+    // ESTADO PARA LA FACTURA (LO NUEVO)
+    const [mostrarFactura, setMostrarFactura] = useState(false);
+    const [ventaParaFactura, setVentaParaFactura] = useState<VentaResponse | null>(null);
 
     // Cargar datos
     useEffect(() => {
@@ -34,7 +38,7 @@ export const VentaView = () => {
         }
     };
 
-    // Agregar al carrito
+    // --- LÓGICA DEL CARRITO ---
     const agregarAlCarrito = () => {
         const producto = medicamentos.find(m => m.id === productoSeleccionado);
         if (!producto) return;
@@ -57,14 +61,12 @@ export const VentaView = () => {
         setCantidad(1);
     };
 
-    // Eliminar del carrito
     const eliminarDelCarrito = (index: number) => {
         const nuevoCarrito = [...carrito];
         nuevoCarrito.splice(index, 1);
         setCarrito(nuevoCarrito);
     };
 
-    // Confirmar Venta
     const finalizarVenta = async () => {
         if (carrito.length === 0) return;
         try {
@@ -77,18 +79,30 @@ export const VentaView = () => {
             };
             await VentaService.registrar(ventaData);
             alert("¡Venta registrada con éxito!");
+            
+            // LIMPIEZA
             setMostrarModal(false);
             setCarrito([]);
-            cargarDatos(); // Recargar historial
+            await cargarDatos(); 
+            
+            // OPCIONAL: Abrir factura automáticamente de la última venta (podrías implementarlo aquí)
+            
         } catch (error) {
             alert("Error al registrar la venta");
         }
     };
 
-    // Calcular total del carrito
-    const totalCarrito = carrito.reduce((acc, item) => acc + (item.subtotal || 0), 0);
+    // --- LÓGICA FACTURA ---
+    const abrirFactura = (venta: VentaResponse) => {
+        setVentaParaFactura(venta);
+        setMostrarFactura(true);
+    };
 
-    // Filtrar historial
+    const imprimirFactura = () => {
+        window.print(); // Abre el diálogo de impresión del navegador
+    };
+
+    const totalCarrito = carrito.reduce((acc, item) => acc + (item.subtotal || 0), 0);
     const ventasFiltradas = ventas.filter(v => v.id.includes(busqueda));
 
     return (
@@ -129,7 +143,7 @@ export const VentaView = () => {
                                 <th style={thStyle}>Fecha</th>
                                 <th style={thStyle}>Método Pago</th>
                                 <th style={thStyle}>Total (Bs)</th>
-                                <th style={thStyle}>Detalles</th>
+                                <th style={thStyle}>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -143,8 +157,13 @@ export const VentaView = () => {
                                         </span>
                                     </td>
                                     <td style={{ padding: 20, fontWeight: 'bold', color: '#27ae60' }}>Bs {v.total.toFixed(2)}</td>
-                                    <td style={{ padding: 20, color: '#7f8c8d', fontSize: 13 }}>
-                                        {v.detalles?.length} productos
+                                    <td style={{ padding: 20 }}>
+                                        <button 
+                                            onClick={() => abrirFactura(v)}
+                                            style={{ background: '#2c3e50', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', display: 'flex', gap: 5, alignItems: 'center', fontSize: 12 }}
+                                        >
+                                            <FileText size={14} /> Ver Recibo
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -154,22 +173,17 @@ export const VentaView = () => {
                 </div>
             </div>
 
-            {/* MODAL NUEVA VENTA (CARRITO) */}
+            {/* MODAL 1: NUEVA VENTA */}
             {mostrarModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 998 }}>
                     <div style={{ background: 'white', width: 800, height: 600, borderRadius: 10, display: 'flex', overflow: 'hidden' }}>
-                        
-                        {/* IZQUIERDA: SELECCIÓN PRODUCTOS */}
+                        {/* IZQUIERDA: SELECCIÓN */}
                         <div style={{ flex: 1, padding: 30, borderRight: '1px solid #eee', display: 'flex', flexDirection: 'column' }}>
                             <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Seleccionar Productos</h3>
                             
                             <div style={{ marginBottom: 15 }}>
                                 <label style={labelStyle}>Producto</label>
-                                <select 
-                                    value={productoSeleccionado} 
-                                    onChange={e => setProductoSeleccionado(e.target.value)} 
-                                    style={inputStyle}
-                                >
+                                <select value={productoSeleccionado} onChange={e => setProductoSeleccionado(e.target.value)} style={inputStyle}>
                                     <option value="">-- Seleccione --</option>
                                     {medicamentos.map(m => (
                                         <option key={m.id} value={m.id} disabled={m.stock === 0}>
@@ -181,28 +195,18 @@ export const VentaView = () => {
 
                             <div style={{ marginBottom: 20 }}>
                                 <label style={labelStyle}>Cantidad</label>
-                                <input 
-                                    type="number" 
-                                    min="1" 
-                                    value={cantidad} 
-                                    onChange={e => setCantidad(+e.target.value)} 
-                                    style={inputStyle} 
-                                />
+                                <input type="number" min="1" value={cantidad} onChange={e => setCantidad(+e.target.value)} style={inputStyle} />
                             </div>
 
-                            <button 
-                                onClick={agregarAlCarrito}
-                                disabled={!productoSeleccionado}
-                                style={{ background: '#3498db', color: 'white', border: 'none', padding: '12px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}
-                            >
+                            <button onClick={agregarAlCarrito} disabled={!productoSeleccionado} style={{ background: '#3498db', color: 'white', border: 'none', padding: '12px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>
                                 Agregar al Carrito
                             </button>
                         </div>
 
-                        {/* DERECHA: RESUMEN CARRITO */}
+                        {/* DERECHA: RESUMEN */}
                         <div style={{ flex: 1, background: '#f8f9fa', padding: 30, display: 'flex', flexDirection: 'column' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0, color: '#2c3e50' }}>Resumen de Venta</h3>
+                                <h3 style={{ margin: 0, color: '#2c3e50' }}>Resumen</h3>
                                 <button onClick={() => setMostrarModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}><X /></button>
                             </div>
 
@@ -219,7 +223,6 @@ export const VentaView = () => {
                                         </div>
                                     </div>
                                 ))}
-                                {carrito.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#ccc' }}>Carrito vacío</div>}
                             </div>
 
                             <div style={{ marginTop: 20 }}>
@@ -227,27 +230,76 @@ export const VentaView = () => {
                                     <span>Total a Pagar:</span>
                                     <span style={{ color: '#27ae60' }}>Bs {totalCarrito.toFixed(2)}</span>
                                 </div>
-                                
-                                <select 
-                                    value={metodoPago} 
-                                    onChange={e => setMetodoPago(e.target.value)} 
-                                    style={{ ...inputStyle, marginBottom: 15 }}
-                                >
-                                    <option>Efectivo</option>
-                                    <option>QR / Transferencia</option>
-                                    <option>Tarjeta</option>
+                                <select value={metodoPago} onChange={e => setMetodoPago(e.target.value)} style={{ ...inputStyle, marginBottom: 15 }}>
+                                    <option>Efectivo</option><option>QR / Transferencia</option><option>Tarjeta</option>
                                 </select>
-
-                                <button 
-                                    onClick={finalizarVenta}
-                                    disabled={carrito.length === 0}
-                                    style={{ width: '100%', background: '#2c3e50', color: 'white', border: 'none', padding: '15px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold', fontSize: 16 }}
-                                >
+                                <button onClick={finalizarVenta} disabled={carrito.length === 0} style={{ width: '100%', background: '#2c3e50', color: 'white', border: 'none', padding: '15px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold', fontSize: 16 }}>
                                     Confirmar Venta
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
 
+            {/* MODAL 2: FACTURA / RECIBO (EL QUE QUERÍAS) */}
+            {mostrarFactura && ventaParaFactura && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+                    <div style={{ background: 'white', width: 400, padding: 0, borderRadius: 5, overflow: 'hidden', boxShadow: '0 5px 25px rgba(0,0,0,0.2)' }}>
+                        {/* Header Factura */}
+                        <div style={{ background: '#2c3e50', color: 'white', padding: 20, textAlign: 'center' }}>
+                            <h2 style={{ margin: 0, fontSize: 22 }}>VETERINARIA SF</h2>
+                            <p style={{ margin: '5px 0 0', fontSize: 12, opacity: 0.8 }}>Dr. David Tejerina</p>
+                            <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>NIT: 123456789 • Tarija, Bolivia</p>
+                        </div>
+                        
+                        {/* Cuerpo Factura */}
+                        <div style={{ padding: 20 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 15, borderBottom: '1px solid #eee', paddingBottom: 10 }}>
+                                <span><b>Nro:</b> {ventaParaFactura.id.substring(0, 8)}</span>
+                                <span>{new Date(ventaParaFactura.fecha).toLocaleDateString()}</span>
+                            </div>
+
+                            <table style={{ width: '100%', fontSize: 13, marginBottom: 20 }}>
+                                <thead>
+                                    <tr style={{ color: '#7f8c8d', textAlign: 'left' }}>
+                                        <th style={{ paddingBottom: 5 }}>Cant.</th>
+                                        <th style={{ paddingBottom: 5 }}>Producto</th>
+                                        <th style={{ paddingBottom: 5, textAlign: 'right' }}>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {ventaParaFactura.detalles?.map((d, i) => (
+                                        <tr key={i}>
+                                            <td style={{ padding: '5px 0' }}>{d.cantidad}</td>
+                                            <td style={{ padding: '5px 0' }}>{d.nombreProducto}</td>
+                                            <td style={{ padding: '5px 0', textAlign: 'right' }}>{d.subtotal?.toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <div style={{ borderTop: '2px dashed #ddd', paddingTop: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 16, fontWeight: 'bold' }}>TOTAL A PAGAR</span>
+                                <span style={{ fontSize: 20, fontWeight: 'bold', color: '#2c3e50' }}>Bs {ventaParaFactura.total.toFixed(2)}</span>
+                            </div>
+                            
+                            <div style={{ marginTop: 20, textAlign: 'center', color: '#7f8c8d', fontSize: 12 }}>
+                                <p>Forma de Pago: {ventaParaFactura.metodoPago}</p>
+                                <div style={{ background: '#f8f9fa', padding: 10, display: 'inline-block', margin: '10px 0' }}>
+                                    <ScanLine size={40} color="#2c3e50" />
+                                </div>
+                                <p>¡Gracias por su preferencia!</p>
+                            </div>
+                        </div>
+
+                        {/* Footer Botones */}
+                        <div style={{ background: '#f1f2f6', padding: 15, display: 'flex', gap: 10 }}>
+                            <button onClick={() => setMostrarFactura(false)} style={{ flex: 1, padding: 10, border: 'none', background: 'white', border: '1px solid #ddd', borderRadius: 4, cursor: 'pointer' }}>Cerrar</button>
+                            <button onClick={imprimirFactura} style={{ flex: 1, padding: 10, border: 'none', background: '#2c3e50', color: 'white', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                                <Printer size={16} /> Imprimir
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
