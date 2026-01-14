@@ -1,0 +1,54 @@
+/* src/index.css */
+:root {
+  font-family: 'Segoe UI', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Colores globales */
+  --bg-dark: #2c3e50;
+  --bg-light: #f4f6f8;
+  --text-main: #2c3e50;
+  --primary: #3498db;
+}
+
+/* IMPORTANTE: Esto elimina los márgenes y asegura pantalla completa */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-light);
+  overflow-x: hidden; /* Evita scroll horizontal indeseado */
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  max-width: none; /* ELIMINA EL LÍMITE DE ANCHO QUE CAUSA EL ESPACIO NEGRO */
+  text-align: left;
+}
+
+/* Estilos de Scrollbar más bonitos (Opcional) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+  background: #bdc3c7; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #95a5a6; 
+}
+
+/* Utilidad para botones */
+button {
+  font-family: inherit;
+}
